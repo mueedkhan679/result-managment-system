@@ -31,7 +31,23 @@ export function AuthProvider({ children }) {
     setAdmin(payload.admin)
     setToken(payload.token)
     localStorage.setItem('rms_admin', JSON.stringify(payload))
-    toast.success('Welcome back, ' + payload.admin.full_name)
+    const welcomeHtml = (
+      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{
+          width: '40px', height: '40px', borderRadius: '50%',
+          background: 'linear-gradient(135deg, #6C5CE7, #8b5cf6)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: '18px'
+        }}>
+          👋
+        </div>
+        <div>
+          <div style={{ fontWeight: 'bold', color: '#0f172a', fontSize: '14px' }}>Welcome, Zoyan!</div>
+          <div style={{ color: '#64748b', fontSize: '12px' }}>Ready to manage results today?</div>
+        </div>
+      </div>
+    )
+    toast(welcomeHtml, { duration: 4000, icon: '🎉' })
     return payload
   }
 
@@ -71,3 +87,4 @@ export function AuthProvider({ children }) {
 }
 
 export const useAuth = () => useContext(AuthContext)
+

@@ -4,6 +4,10 @@ import { supabase } from '../../lib/supabase'
 import { gradeForPercentage } from '../../utils/grading'
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { Download, Printer, ArrowLeft, Award, TrendingUp, BookOpen, User2 } from 'lucide-react'
+import Spinner from '../../components/ui/Spinner'
+
+const ACCENT_CLASSES = ['result-card-blue','result-card-green','result-card-purple','result-card-amber','result-card-rose','result-card-cyan']
 
 export default function ResultView(){
   const { id } = useParams()
@@ -52,27 +56,6 @@ export default function ResultView(){
     setResults(rows)
     setLoading(false)
     return
-
-    const visibleRows = (resultRows || []).filter(row => {
-      const status = String(row.status || '').toLowerCase()
-      return status === 'published' || status === 'approved' || !status
-    })
-
-    const subjectIds = [...new Set((visibleRows.length ? visibleRows : (resultRows || [])).map(r => r.subject_id).filter(Boolean))]
-    let subjectNames = {}
-    if (subjectIds.length) {
-      const { data: subjectsData } = await supabase
-        .from('subjects')
-        .select('id, subject_name')
-        .in('id', subjectIds)
-      subjectNames = Object.fromEntries((subjectsData || []).map(s => [s.id, s.subject_name]))
-    }
-
-    const rowsToShow = (visibleRows.length ? visibleRows : (resultRows || [])).map(r => ({ ...r, subject_name: subjectNames[r.subject_id] || 'Unknown' }))
-
-    setStudent(studentData)
-    setResults(rowsToShow)
-    setLoading(false)
   }
 
   function totals(){
@@ -82,87 +65,198 @@ export default function ResultView(){
     return { total, obtained, percentage }
   }
 
+  function gradeClass(g){
+    if (!g) return 'grade-f'
+    const upper = String(g).toUpperCase()
+    if (upper === 'A+' || upper === 'A1') return 'grade-a-plus'
+    if (upper === 'A') return 'grade-a'
+    if (upper === 'B') return 'grade-b'
+    if (upper === 'C') return 'grade-c'
+    if (upper === 'D') return 'grade-d'
+    return 'grade-f'
+  }
+
+  function getAccent(i){
+    return ACCENT_CLASSES[i % ACCENT_CLASSES.length]
+  }
+
   function downloadPDF(){
     const doc = new jsPDF()
-    const schoolName = import.meta.env.VITE_SCHOOL_NAME || 'My School'
-    doc.setFontSize(16)
+    const schoolName = 'Result Management System'
+    doc.setFontSize(18)
     doc.text(schoolName, 20, 20)
     doc.setFontSize(12)
-    doc.text(`Name: ${student.student_name}`, 20, 32)
-    doc.text(`Father: ${student.father_name}`, 20, 40)
-    doc.text(`Class: ${student.class}`, 20, 48)
-    doc.text(`Roll: ${student.roll_no}`, 20, 56)
+    doc.text('Name: ' + student.student_name, 20, 32)
+    doc.text('Father: ' + student.father_name, 20, 40)
+    doc.text('Class: ' + student.class, 20, 48)
+    doc.text('Roll: ' + student.roll_no, 20, 56)
 
     let y = 70
     doc.autoTable({
       startY: y,
-      head: [['Subject','Total','Obtained','Grade']],
-      body: results.map(r=> [r.subject_name, String(r.total_marks), String(r.obtained_marks), gradeForPercentage((r.obtained_marks/r.total_marks)*100)])
+      head: [['Subject', 'Total Marks', 'Obtained Marks', 'Grade']],
+      body: results.map(r => [r.subject_name, String(r.total_marks), String(r.obtained_marks), gradeForPercentage((r.obtained_marks/r.total_marks)*100)])
     })
     const { total, obtained, percentage } = totals()
-    doc.text(`Total: ${obtained}/${total}`, 20, doc.lastAutoTable.finalY + 10)
-    doc.text(`Percentage: ${percentage}%`, 20, doc.lastAutoTable.finalY + 18)
-    doc.save(`Marksheet-${student.roll_no}.pdf`)
+    doc.text('Total: ' + obtained + '/' + total, 20, doc.lastAutoTable.finalY + 10)
+    doc.text('Percentage: ' + percentage + '%', 20, doc.lastAutoTable.finalY + 18)
+    doc.save('Marksheet-' + student.roll_no + '.pdf')
   }
 
-  if (loading) return <div className="p-8">Loading…</div>
-  if (error || !student) return <div className="p-8">{error || 'No result found'}</div>
+  if (loading) return (
+    <div className='min-h-screen flex items-center justify-center'>
+      <div className='text-center animate-fade-in-up'>
+        <Spinner size={4} />
+        <p className='mt-4 text-slate-500'>Loading results...</p>
+      </div>
+    </div>
+  )
+  if (error || !student) return (
+    <div className='min-h-screen flex items-center justify-center'>
+      <div className='card-glass rounded-2xl p-8 text-center animate-fade-in-up'>
+        <p className='text-slate-500'>{error || 'No result found'}</p>
+      </div>
+    </div>
+  )
 
   const { total, obtained, percentage } = totals()
 
   return (
-    <div className="min-h-screen p-8 flex justify-center">
-      <div className="w-full max-w-3xl card-glass p-6 rounded">
-        <div className="flex justify-between items-center mb-4">
-          <div>
-            <h2 className="text-xl font-semibold">{student.student_name}</h2>
-            <div className="text-sm text-slate-400">Father: {student.father_name}</div>
-            <div className="text-sm text-slate-400">Class: {student.class} • Roll {student.roll_no}</div>
-          </div>
-          <div>
-            <button onClick={()=>window.print()} className="mr-2 px-3 py-1 rounded bg-primary text-white">Print</button>
-            <button onClick={downloadPDF} className="px-3 py-1 rounded bg-slate-700 text-white">Download PDF</button>
+    <div className='min-h-screen p-4 md:p-8 overflow-x-hidden'>
+      <div className='bg-shapes'>
+        <div className='bg-shape' />
+        <div className='bg-shape' />
+      </div>
+
+      <div className='relative z-10 max-w-4xl mx-auto'>
+        <button onClick={() => window.history.back()} className='mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white shadow-sm text-slate-600 hover:text-primary transition-colors animate-fade-in-left'>
+          <ArrowLeft size={18} />
+          <span className='text-sm font-medium'>Back</span>
+        </button>
+
+        <div className='card-glass rounded-3xl p-6 shadow-xl mb-6 animate-fade-in-up'>
+          <div className='flex flex-col md:flex-row items-start md:items-center justify-between gap-4'>
+            <div className='flex items-center gap-4'>
+              <div className='w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center shadow-lg animate-bounce-in'>
+                <User2 size={32} className='text-white' />
+              </div>
+              <div>
+                <h2 className='text-2xl font-bold text-slate-800'>{student.student_name}</h2>
+                <p className='text-sm text-slate-500'>Father: {student.father_name}</p>
+                <p className='text-sm text-slate-500'>Class: {student.class} // Roll {student.roll_no}</p>
+                {results[0]?.declared_at && (
+                  <p className='text-xs font-medium text-emerald-600 mt-1'>
+                    Result Declared: {new Date(results[0].declared_at).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className='flex gap-3'>
+              <button onClick={() => window.print()} className='inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white shadow-sm text-slate-700 hover:shadow-md transition-all'>
+                <Printer size={18} />
+                <span className='text-sm font-medium'>Print</span>
+              </button>
+              <button onClick={downloadPDF} className='inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-gradient-to-r from-primary to-purple-600 text-white shadow-md hover:shadow-lg transition-all'>
+                <Download size={18} />
+                <span className='text-sm font-medium'>Download PDF</span>
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-4 mb-6 md:grid-cols-2">
-          {results.length > 0 ? results.map(r => (
-            <div key={r.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-lg font-semibold text-slate-900">{r.subject_name}</div>
-                  <div className="text-sm text-slate-500">Total Marks: {r.total_marks}</div>
+        <div className='grid grid-cols-2 md:grid-cols-4 gap-4 mb-6'>
+          <div className='card-glass rounded-2xl p-4 text-center card-lift animate-fade-in-up delay-100'>
+            <BookOpen size={20} className='text-primary mx-auto mb-1.5' />
+            <div className='text-xs text-slate-500'>Total Subjects</div>
+            <div className='text-xl font-bold text-slate-800'>{results.length}</div>
+          </div>
+          <div className='card-glass rounded-2xl p-4 text-center card-lift animate-fade-in-up delay-200'>
+            <Award size={20} className='text-emerald-500 mx-auto mb-1.5' />
+            <div className='text-xs text-slate-500'>Total Marks</div>
+            <div className='text-xl font-bold text-slate-800'>{total}</div>
+          </div>
+          <div className='card-glass rounded-2xl p-4 text-center card-lift animate-fade-in-up delay-300'>
+            <TrendingUp size={20} className='text-blue-500 mx-auto mb-1.5' />
+            <div className='text-xs text-slate-500'>Obtained</div>
+            <div className='text-xl font-bold text-slate-800'>{obtained}</div>
+          </div>
+          <div className='card-glass rounded-2xl p-4 text-center card-lift animate-fade-in-up delay-400'>
+            <div className='inline-flex items-center justify-center w-10 h-10 rounded-full mx-auto mb-1.5 bg-gradient-to-br from-primary to-purple-500'>
+              <span className='text-sm font-bold text-white'>{gradeForPercentage(percentage)}</span>
+            </div>
+            <div className='text-xs text-slate-500'>Percentage</div>
+            <div className='text-xl font-bold text-slate-800'>{percentage}%</div>
+          </div>
+        </div>
+
+        <div className='grid gap-4 mb-6'>
+          {results.length > 0 ? results.map((r, i) => (
+            <div key={r.id} className={getAccent(i) + ' card-glass rounded-2xl p-5 shadow-sm card-lift animate-fade-in-up delay-' + Math.min((i+2)*100, 600)}>
+              <div className='flex items-center justify-between gap-3'>
+                <div className='flex items-center gap-3'>
+                  <div className='w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400'>
+                    <BookOpen size={22} />
+                  </div>
+                  <div>
+                    <div className='text-lg font-semibold text-slate-900'>{r.subject_name}</div>
+                    <div className='text-sm text-slate-500'>Total Marks: {r.total_marks}</div>
+                  </div>
                 </div>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                <span className='px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wide'>
                   {r.status ? String(r.status).toUpperCase() : 'PENDING'}
                 </span>
               </div>
-              <div className="mt-4 flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm text-slate-400">Obtained</div>
-                  <div className="text-2xl font-semibold text-slate-900">{r.obtained_marks}</div>
+
+              <div className='mt-5 flex items-center justify-between gap-3'>
+                <div className='flex-1'>
+                  <div className='text-xs text-slate-400 mb-1'>Obtained Marks</div>
+                  <div className='text-2xl font-bold text-slate-900'>{r.obtained_marks}</div>
                 </div>
-                <div className="text-right">
-                  <div className="text-sm text-slate-400">Grade</div>
-                  <div className="text-2xl font-semibold text-slate-900">{gradeForPercentage((r.obtained_marks/r.total_marks)*100)}</div>
+                <div className='flex-1 text-right'>
+                  <div className='text-xs text-slate-400 mb-1'>Grade</div>
+                  <div className='inline-flex items-center justify-center px-4 py-1.5 rounded-full text-base font-bold bg-gradient-to-r from-primary to-purple-500 text-white'>
+                    {gradeForPercentage((r.obtained_marks/r.total_marks)*100)}
+                  </div>
                 </div>
+              </div>
+
+              <div className='mt-4 progress-bar'>
+                <div className='progress-bar-fill bg-gradient-to-r from-primary to-purple-500' style={{ width: (Number(r.obtained_marks)/Number(r.total_marks)*100).toFixed(1) + '%' }} />
               </div>
             </div>
           )) : (
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500 md:col-span-2">
+            <div className='card-glass rounded-2xl p-8 text-center text-slate-500'>
               No published results found for this student.
             </div>
           )}
         </div>
 
-        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div>Total Marks: {total}</div>
-            <div>Obtained: {obtained}</div>
-            <div>Percentage: {percentage}%</div>
-            <div>Overall Grade: {gradeForPercentage(percentage)}</div>
+        <div className='card-glass rounded-2xl p-6 shadow-sm animate-slide-in-up'>
+          <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-4'>
+            <div className='flex flex-wrap gap-6'>
+              <div>
+                <div className='text-sm text-slate-500'>Total Marks</div>
+                <div className='text-lg font-bold text-slate-800'>{total}</div>
+              </div>
+              <div>
+                <div className='text-sm text-slate-500'>Obtained</div>
+                <div className='text-lg font-bold text-slate-800'>{obtained}</div>
+              </div>
+              <div>
+                <div className='text-sm text-slate-500'>Percentage</div>
+                <div className='text-lg font-bold text-slate-800'>{percentage}%</div>
+              </div>
+              <div>
+                <div className='text-sm text-slate-500'>Overall Grade</div>
+                <div className='inline-flex items-center justify-center px-3 py-1 rounded-full text-sm font-bold bg-gradient-to-r from-primary to-purple-500 text-white'>
+                  {gradeForPercentage(percentage)}
+                </div>
+              </div>
+            </div>
+            <div className={`text-lg font-bold px-5 py-2.5 rounded-xl ${results.some(r => ['published','approved'].includes(String(r.status || '').toLowerCase())) ? 'bg-green-100 text-green-700' : (results.length ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600')}`}>
+              {results.some(r => ['published','approved'].includes(String(r.status || '').toLowerCase())) ? 'Published' : (results.length ? 'Pending Review' : 'Not Found')}
+            </div>
           </div>
-          <div className="text-lg font-semibold">Status: {results.some(r => ['published','approved'].includes(String(r.status || '').toLowerCase())) ? 'Published' : (results.length ? 'Pending Review' : 'Not Found')}</div>
         </div>
       </div>
     </div>

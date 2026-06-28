@@ -56,6 +56,7 @@ create table if not exists results (
   obtained_marks int not null,
   grade text,
   status text default 'pending',
+  declared_at timestamp with time zone,
   created_at timestamp with time zone default timezone('utc', now())
 );
 
@@ -178,7 +179,7 @@ declare rid uuid; val text;
 begin
   for val in select jsonb_array_elements_text(ids) loop
     rid := val::uuid;
-    update results set status='published' where id = rid;
+    update results set status='published', declared_at=timezone('utc', now()) where id = rid;
   end loop;
 end;
 $$;
@@ -241,7 +242,7 @@ $$;
 -- list results
 drop function if exists admin_list_results(text);
 create function admin_list_results(status text)
-returns table(id uuid, student_id uuid, student_name text, roll_no int, class text, subject_id uuid, subject_name text, total_marks int, obtained_marks int)
+returns table(id uuid, student_id uuid, student_name text, roll_no int, class text, subject_id uuid, subject_name text, total_marks int, obtained_marks int, declared_at timestamp with time zone)
 language sql
 security definer
 as $$
@@ -258,7 +259,7 @@ create function admin_approve_result(result_id uuid)
 returns void
 language sql
 security definer
-as $$ update results set status='published' where id = result_id $$;
+as $$ update results set status='published', declared_at=timezone('utc', now()) where id = result_id $$;
 
 drop function if exists admin_delete_result(uuid);
 create function admin_delete_result(result_id uuid)
@@ -567,4 +568,10 @@ grant execute on function admin_create_password_reset(text) to anon, authenticat
 grant execute on function admin_reset_password(text, text) to anon, authenticated;
 grant execute on function admin_add_students_bulk(jsonb) to anon, authenticated;
 grant execute on function admin_add_results_csv(jsonb) to anon, authenticated;
+
+
+
+
+
+
 

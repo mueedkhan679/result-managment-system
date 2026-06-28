@@ -1,0 +1,82 @@
+﻿import React, { useEffect, useState } from 'react'
+
+import { supabase } from '../../lib/supabase'
+
+import toast from 'react-hot-toast'
+
+
+export default function PublishedResults(){
+
+  const [results, setResults] = useState([])
+
+  const [query, setQuery] = useState('')
+
+  const [editing, setEditing] = useState(null)
+
+  const [editValue, setEditValue] = useState('')
+
+  const [loading, setLoading] = useState(false)
+
+
+  useEffect(()=>{ fetchPublished() }, [])
+
+  useEffect(()=>{
+
+    function onUpdated(){ fetchPublished() }
+
+    window.addEventListener('results-updated', onUpdated)
+
+    return () => window.removeEventListener('results-updated', onUpdated)
+
+  }, [])
+
+
+  async function fetchPublished(){
+
+    setLoading(true)
+
+    try{
+
+      const { data, error } = await supabase.rpc('admin_list_results',{status:'published'})
+
+      if(error) throw error
+
+      setResults(data || [])
+
+    }catch(err){
+
+      toast.error(err.message || 'Failed to load')
+
+    }finally{ setLoading(false) }
+
+  }
+
+
+  async function del(id){
+
+    if(!window.confirm('Delete this published result?')) return
+
+    setLoading(true)
+
+    try{
+
+      const { error } = await supabase.rpc('admin_delete_result',{result_id: id})
+
+      if(error) throw error
+
+      setResults(prev => prev.filter(item => item.id !== id))
+
+      window.dispatchEvent(new Event('results-updated'))
+
+      toast.success('Deleted from the portal')
+
+    }catch(err){
+
+      toast.error(err.message || 'Failed')
+
+    }finally{ setLoading(false) }
+
+  }
+
+
+  async function saveEdit(id){
